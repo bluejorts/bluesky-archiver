@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  bluesky-archiver:
+    build: .
+    environment:
+      # Required environment variables
+      BLUESKY_USERNAME: "your-username"  # Without @
+      BLUESKY_APP_PASSWORD: "your-app-password"  # Use app password, not main password
+      
+      # Optional environment variables with defaults
+      BLUESKY_OUTPUT: "/archive"  # Directory inside container
+      BLUESKY_LIMIT: "100"  # Max posts per run, 0 = unlimited
+      BLUESKY_VERBOSE: "false"  # Set to "true" for debug output
+      BLUESKY_NSFW_ONLY: "false"  # Set to "true" to only archive NSFW posts
+      BLUESKY_DELAY: "0"  # Milliseconds between API requests
+      BLUESKY_RESUME: "false"  # Set to "true" to resume from last position
+    volumes:
+      # Mount local directory to persist archives
+      - ./archive:/archive

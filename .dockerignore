@@ -1,0 +1,10 @@
+target/
+Dockerfile
+.dockerignore
+.git/
+.gitignore
+*.md
+example-usage.sh
+archive/
+*.db
+.cursor
