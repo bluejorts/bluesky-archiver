@@ -87,7 +87,34 @@ bluesky-archiver --username YOUR_USERNAME --password YOUR_APP_PASSWORD
 
 ### Environment Variables
 
-You can set your app password as an environment variable to avoid typing it:
+When using Docker, you can configure the archiver using the following environment variables:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `BLUESKY_USERNAME` | Yes | - | Your Bluesky username (without @) |
+| `BLUESKY_APP_PASSWORD` | Yes | - | Your Bluesky app password (NOT your main password) |
+| `BLUESKY_OUTPUT` | No | `/archive` | Directory to save archived images |
+| `BLUESKY_LIMIT` | No | `0` | Maximum posts to fetch per run (0 = unlimited) |
+| `BLUESKY_DELAY` | No | `100` | Delay between API requests in milliseconds |
+| `BLUESKY_VERBOSE` | No | `false` | Enable verbose/debug logging |
+| `BLUESKY_NSFW_ONLY` | No | `false` | Only archive posts with NSFW/content warning labels |
+| `BLUESKY_RESUME` | No | `false` | Resume from last saved position |
+
+Example Docker run with all options:
+```bash
+docker run -v ./archive:/archive \
+  -e BLUESKY_USERNAME=your-username \
+  -e BLUESKY_APP_PASSWORD=your-app-password \
+  -e BLUESKY_OUTPUT=/archive \
+  -e BLUESKY_LIMIT=1000 \
+  -e BLUESKY_DELAY=200 \
+  -e BLUESKY_VERBOSE=true \
+  -e BLUESKY_NSFW_ONLY=false \
+  -e BLUESKY_RESUME=true \
+  polymetric/bluesky-archiver:latest
+```
+
+For standalone usage, you can set the app password as an environment variable:
 
 ```bash
 export BLUESKY_APP_PASSWORD="your-app-password"
