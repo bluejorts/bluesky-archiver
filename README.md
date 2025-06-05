@@ -1,10 +1,11 @@
 # Bluesky Archiver
 
-A command-line tool to archive image posts from a Bluesky user's likes. The tool tracks previously downloaded images to avoid duplicates, making it suitable for scheduled runs.
+A command-line tool to archive image posts from Bluesky. You can archive images from your liked posts or from a specific user's timeline. The tool tracks previously downloaded images to avoid duplicates, making it suitable for scheduled runs.
 
 ## Features
 
-- Downloads all images from liked posts
+- Downloads all images from liked posts or from a specific user's timeline
+- Filters out reposts and quote posts when archiving user timelines
 - Tracks downloaded images in SQLite database to avoid re-downloading
 - Organizes images by author handle
 - Automatically separates NSFW/content warning posts to a separate directory
@@ -70,8 +71,15 @@ The binary will be available at `target/release/bluesky-archiver`
 
 ## Usage
 
+### Archive your liked posts
 ```bash
 bluesky-archiver --username YOUR_USERNAME --password YOUR_APP_PASSWORD
+```
+
+### Archive all images from a specific user
+To archive all image posts from a specific user (excluding reposts and quote posts):
+```bash
+bluesky-archiver --username YOUR_USERNAME --password YOUR_APP_PASSWORD --archive-user TARGET_USER
 ```
 
 ### Command Line Options
@@ -84,6 +92,7 @@ bluesky-archiver --username YOUR_USERNAME --password YOUR_APP_PASSWORD
 - `--nsfw-only`: Only archive posts with NSFW/content warning labels
 - `-d, --delay <DELAY>`: Delay between API requests in milliseconds (helps avoid rate limits)
 - `--resume`: Resume from last saved position (useful for large archives)
+- `--archive-user <USERNAME>`: Archive all image posts from a specific user (without @)
 
 ### Environment Variables
 

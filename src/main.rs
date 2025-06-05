@@ -43,6 +43,10 @@ struct Args {
     /// Resume from last saved position (useful for large archives)
     #[arg(long)]
     resume: bool,
+
+    /// Archive all image posts from a specific user (without @)
+    #[arg(long)]
+    archive_user: Option<String>,
 }
 
 #[tokio::main]
@@ -69,49 +73,98 @@ async fn main() -> Result<()> {
     let mut client = bluesky::Client::new();
     client.login(&args.username, &args.password).await?;
 
-    // Fetch liked posts
-    let cursor_file = args.output.join(".cursor");
-    let start_cursor = if args.resume && cursor_file.exists() {
-        match std::fs::read_to_string(&cursor_file) {
-            Ok(cursor) => {
-                info!("Resuming from saved cursor");
-                Some(cursor.trim().to_string())
+    // Check if we're archiving a specific user's posts or liked posts
+    if let Some(target_user) = args.archive_user {
+        info!("Archiving all image posts from user: {}", target_user);
+        
+        // Fetch user's posts
+        let cursor_file = args.output.join(format!(".cursor_{}", target_user));
+        let start_cursor = if args.resume && cursor_file.exists() {
+            match std::fs::read_to_string(&cursor_file) {
+                Ok(cursor) => {
+                    info!("Resuming from saved cursor");
+                    Some(cursor.trim().to_string())
+                }
+                Err(e) => {
+                    warn!("Failed to read cursor file: {}", e);
+                    None
+                }
             }
-            Err(e) => {
-                warn!("Failed to read cursor file: {}", e);
-                None
-            }
+        } else {
+            None
+        };
+        
+        let cursor_file_clone = cursor_file.clone();
+        let posts = client.get_user_posts_with_options(
+            &target_user,
+            args.limit,
+            args.delay,
+            start_cursor,
+            Some(Box::new(move |cursor| {
+                if let Err(e) = std::fs::write(&cursor_file_clone, cursor) {
+                    warn!("Failed to save cursor: {}", e);
+                }
+            }))
+        ).await?;
+        
+        // Clear cursor on successful completion
+        if cursor_file.exists() {
+            let _ = std::fs::remove_file(&cursor_file);
         }
+        
+        // Archive images from user's posts
+        let archiver = archive::Archiver::new(db, args.output, &client);
+        let stats = archiver.archive_posts(posts, args.nsfw_only).await?;
+        
+        info!(
+            "Archive complete. Downloaded: {}, Skipped: {}, Failed: {}",
+            stats.downloaded, stats.skipped, stats.failed
+        );
     } else {
-        None
-    };
-    
-    let cursor_file_clone = cursor_file.clone();
-    let likes = client.get_likes_with_options(
-        &args.username, 
-        args.limit, 
-        args.delay,
-        start_cursor,
-        Some(Box::new(move |cursor| {
-            if let Err(e) = std::fs::write(&cursor_file_clone, cursor) {
-                warn!("Failed to save cursor: {}", e);
+        // Original behavior: fetch liked posts
+        let cursor_file = args.output.join(".cursor");
+        let start_cursor = if args.resume && cursor_file.exists() {
+            match std::fs::read_to_string(&cursor_file) {
+                Ok(cursor) => {
+                    info!("Resuming from saved cursor");
+                    Some(cursor.trim().to_string())
+                }
+                Err(e) => {
+                    warn!("Failed to read cursor file: {}", e);
+                    None
+                }
             }
-        }))
-    ).await?;
-    
-    // Clear cursor on successful completion
-    if cursor_file.exists() {
-        let _ = std::fs::remove_file(&cursor_file);
+        } else {
+            None
+        };
+        
+        let cursor_file_clone = cursor_file.clone();
+        let likes = client.get_likes_with_options(
+            &args.username, 
+            args.limit, 
+            args.delay,
+            start_cursor,
+            Some(Box::new(move |cursor| {
+                if let Err(e) = std::fs::write(&cursor_file_clone, cursor) {
+                    warn!("Failed to save cursor: {}", e);
+                }
+            }))
+        ).await?;
+        
+        // Clear cursor on successful completion
+        if cursor_file.exists() {
+            let _ = std::fs::remove_file(&cursor_file);
+        }
+
+        // Archive images from liked posts
+        let archiver = archive::Archiver::new(db, args.output, &client);
+        let stats = archiver.archive_posts(likes, args.nsfw_only).await?;
+        
+        info!(
+            "Archive complete. Downloaded: {}, Skipped: {}, Failed: {}",
+            stats.downloaded, stats.skipped, stats.failed
+        );
     }
-
-    // Archive images from liked posts
-    let archiver = archive::Archiver::new(db, args.output, &client);
-    let stats = archiver.archive_posts(likes, args.nsfw_only).await?;
-
-    info!(
-        "Archive complete. Downloaded: {}, Skipped: {}, Failed: {}",
-        stats.downloaded, stats.skipped, stats.failed
-    );
 
     Ok(())
 }
