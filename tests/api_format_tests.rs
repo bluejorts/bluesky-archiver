@@ -1,5 +1,5 @@
-use bluesky_archiver::bluesky::{Client, Embed, Post};
 use bluesky_archiver::archive::Archiver;
+use bluesky_archiver::bluesky::{Client, Embed, Post};
 use bluesky_archiver::database::Database;
 use serde_json::json;
 use tempfile::TempDir;
@@ -45,17 +45,23 @@ async fn test_archive_with_new_blob_format() {
     });
 
     let post: Post = serde_json::from_value(post_json).unwrap();
-    
+
     // Verify the post parses correctly
-    assert_eq!(post.uri, "at://did:plc:test/app.bsky.feed.post/3kqy6gvh2gk2x");
-    
+    assert_eq!(
+        post.uri,
+        "at://did:plc:test/app.bsky.feed.post/3kqy6gvh2gk2x"
+    );
+
     // Check that we can extract the embed
     if let Some(embed_value) = post.record.get("embed") {
         let embed: Embed = serde_json::from_value(embed_value.clone()).unwrap();
         match embed {
             Embed::Images { images, .. } => {
                 assert_eq!(images.len(), 1);
-                assert_eq!(images[0].image.ref_.link, "bafkreihjr5hfxbqovqiw4dci5rqhm3ebvn6pbylmupfxj5vjvawmkjeulm");
+                assert_eq!(
+                    images[0].image.ref_.link,
+                    "bafkreihjr5hfxbqovqiw4dci5rqhm3ebvn6pbylmupfxj5vjvawmkjeulm"
+                );
                 assert_eq!(images[0].image.mime_type, "image/jpeg");
                 assert_eq!(images[0].image.size, 234567);
             }
@@ -73,9 +79,9 @@ async fn test_archive_with_new_blob_format() {
     let db = Database::new(&db_path).unwrap();
     let output_dir = temp_dir.path().to_path_buf();
     let client = Client::new();
-    
+
     let _archiver = Archiver::new(db, output_dir, &client);
-    
+
     // The important thing is that the post and embed parse correctly
     // which we've already verified above
 }
@@ -123,14 +129,14 @@ fn test_real_world_api_response_parsing() {
 
     // Test parsing the full post
     let post: Post = serde_json::from_value(api_response).unwrap();
-    
+
     // The important thing is that the archiver can extract images from this format
     // Let's test the same way the archiver does it
     if let Some(embed_value) = post.record.get("embed") {
         // Check that the embed has the right type
         let embed_type = embed_value.get("$type").and_then(|v| v.as_str()).unwrap();
         assert_eq!(embed_type, "app.bsky.embed.images");
-        
+
         // The archiver would parse it like this, which should work
         let result = serde_json::from_value::<Embed>(embed_value.clone());
         assert!(result.is_ok(), "Failed to parse embed: {:?}", result.err());
@@ -192,7 +198,7 @@ fn test_multiple_images_parsing() {
     let post: Post = serde_json::from_value(post_json).unwrap();
     let embed_value = post.record.get("embed").unwrap();
     let embed: Embed = serde_json::from_value(embed_value.clone()).unwrap();
-    
+
     match embed {
         Embed::Images { images, .. } => {
             assert_eq!(images.len(), 2);

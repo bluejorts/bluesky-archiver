@@ -138,7 +138,10 @@ async fn test_blob_ref_parsing() {
     use bluesky_archiver::bluesky::View;
     let view: View = serde_json::from_value(blob_json).unwrap();
     assert_eq!(view.type_, "blob");
-    assert_eq!(view.ref_.link, "bafkreihjr5hfxbqovqiw4dci5rqhm3ebvn6pbylmupfxj5vjvawmkjeulm");
+    assert_eq!(
+        view.ref_.link,
+        "bafkreihjr5hfxbqovqiw4dci5rqhm3ebvn6pbylmupfxj5vjvawmkjeulm"
+    );
     assert_eq!(view.mime_type, "image/jpeg");
     assert_eq!(view.size, 123456);
 }
