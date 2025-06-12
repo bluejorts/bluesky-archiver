@@ -39,7 +39,10 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
-      - name: Run unit tests
+      - name: Run all tests
+        env:
+          BLUESKY_USERNAME: ${{ secrets.BLUESKY_USERNAME }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
         run: cargo test --verbose
 
       - name: Run clippy
@@ -48,47 +51,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
 
-  integration-test:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    # Only run integration tests if credentials are available
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Run integration tests
-        env:
-          BLUESKY_USERNAME: ${{ secrets.BLUESKY_USERNAME }}
-          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
-        run: |
-          # Only run integration tests if credentials are set
-          if [ -n "$BLUESKY_USERNAME" ] && [ -n "$BLUESKY_APP_PASSWORD" ]; then
-            echo "Running integration tests with authentication..."
-            cargo test --verbose tests/integration/
-          else
-            echo "Skipping integration tests - credentials not available"
-          fi
-
   docker:
     name: Build Docker Image
-    needs: [test, integration-test]
-    if: always() && (needs.test.result == 'success') && (needs.integration-test.result == 'success' || needs.integration-test.result == 'skipped')
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
