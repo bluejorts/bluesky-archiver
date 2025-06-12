@@ -95,8 +95,8 @@ pub enum Embed {
 #[allow(dead_code)]
 pub struct Image {
     pub alt: Option<String>,
-    pub fullsize: String,
-    pub thumb: String,
+    pub fullsize: Option<String>,
+    pub thumb: Option<String>,
     #[serde(rename = "aspectRatio")]
     pub aspect_ratio: Option<AspectRatio>,
     pub image: View,
