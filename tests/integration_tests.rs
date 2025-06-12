@@ -41,6 +41,7 @@ async fn test_full_archive_workflow() {
             vec![]
         }
     };
+    let post_count = posts.len();
     let has_posts = !posts.is_empty();
 
     let archiver = Archiver::new(db, output_dir.path().to_path_buf(), &client);
@@ -53,7 +54,7 @@ async fn test_full_archive_workflow() {
 
     // Check that archiver ran successfully
     if has_posts {
-        println!("Processed {} posts", posts.len());
+        println!("Processed {} posts", post_count);
     } else {
         println!("No posts to process - test completed successfully");
     }
