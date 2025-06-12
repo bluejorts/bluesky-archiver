@@ -19,7 +19,7 @@ async fn test_full_archive_workflow() {
 
     client.login(&username, &password).await.unwrap();
 
-    let posts = client.get_likes(&username, 5).await.unwrap();
+    let posts = client.get_likes_with_options(&username, 5, 0, None, None).await.unwrap();
     let has_posts = !posts.is_empty();
     assert!(has_posts, "No liked posts found for test user");
 

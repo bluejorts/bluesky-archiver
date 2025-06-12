@@ -148,6 +148,7 @@ impl Database {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_stats(&self) -> Result<(i64, i64)> {
         let post_count: i64 =
             self.conn

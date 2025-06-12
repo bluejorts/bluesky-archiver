@@ -16,6 +16,7 @@ pub struct Client {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct Session {
     did: String,
     #[serde(rename = "accessJwt")]
@@ -30,6 +31,7 @@ struct LoginResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct Post {
     pub uri: String,
     pub cid: String,
@@ -41,6 +43,7 @@ pub struct Post {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct Label {
     pub src: String,
     pub uri: String,
@@ -50,6 +53,7 @@ pub struct Label {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct Author {
     pub did: String,
     pub handle: String,
@@ -58,6 +62,7 @@ pub struct Author {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct Record {
     #[serde(rename = "$type")]
     pub record_type: String,
@@ -69,6 +74,7 @@ pub struct Record {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
+#[allow(dead_code)]
 pub enum Embed {
     Images {
         #[serde(rename = "$type")]
@@ -84,6 +90,7 @@ pub enum Embed {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct Image {
     pub alt: Option<String>,
     pub fullsize: String,
@@ -94,6 +101,7 @@ pub struct Image {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct AspectRatio {
     pub width: u32,
     pub height: u32,
@@ -108,6 +116,7 @@ pub struct View {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct External {
     pub uri: String,
     pub title: String,
@@ -192,19 +201,6 @@ impl Client {
         Ok(())
     }
 
-    pub async fn get_likes(&self, actor: &str, limit: usize) -> Result<Vec<Post>> {
-        self.get_likes_with_delay(actor, limit, 0).await
-    }
-
-    pub async fn get_likes_with_delay(
-        &self,
-        actor: &str,
-        limit: usize,
-        delay_ms: u64,
-    ) -> Result<Vec<Post>> {
-        self.get_likes_with_options(actor, limit, delay_ms, None, None)
-            .await
-    }
 
     pub async fn get_likes_with_options(
         &self,

@@ -20,6 +20,15 @@ cargo run --release
 ### Test
 ```bash
 cargo test
+
+# Run specific test module
+cargo test database_tests
+cargo test bluesky_tests
+cargo test archive_tests
+cargo test advanced_tests
+
+# Run integration tests (requires credentials)
+TEST_BLUESKY_USERNAME=your.handle TEST_BLUESKY_PASSWORD=your-app-password cargo test -- --ignored
 ```
 
 ### Lint & Format

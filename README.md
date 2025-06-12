@@ -217,6 +217,31 @@ cargo test
 cargo run -- -u your.username -p your-app-password
 ```
 
+## Testing
+
+Run the test suite:
+
+```bash
+# Run all unit tests
+cargo test
+
+# Run tests with output
+cargo test -- --nocapture
+
+# Run specific test
+cargo test test_database_creation
+
+# Run integration tests (requires Bluesky credentials)
+TEST_BLUESKY_USERNAME=your.handle TEST_BLUESKY_PASSWORD=your-app-password cargo test -- --ignored
+```
+
+### Test Coverage
+
+The test suite includes:
+- **Unit tests** for database operations, API client, and archive functionality
+- **Integration tests** for full archive workflows (requires valid credentials)
+- **Advanced tests** for NSFW filtering, duplicate detection, and statistics
+
 ## License
 
 MIT
