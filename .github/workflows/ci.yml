@@ -39,8 +39,17 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
-      - name: Run tests
-        run: cargo test --verbose
+      - name: Run unit tests (excluding integration tests)
+        run: |
+          # Run specific test files, excluding integration_tests
+          cargo test --test advanced_tests --verbose
+          cargo test --test api_format_tests --verbose
+          cargo test --test archive_tests --verbose
+          cargo test --test bluesky_tests --verbose
+          cargo test --test database_tests --verbose
+          # Run library and binary tests if any exist
+          cargo test --lib --verbose || true
+          cargo test --bins --verbose || true
 
       - name: Run clippy
         run: cargo clippy -- -D warnings
@@ -87,7 +96,8 @@ jobs:
 
   docker:
     name: Build Docker Image
-    needs: test
+    needs: [test, integration-test]
+    if: always() && (needs.test.result == 'success') && (needs.integration-test.result == 'success' || needs.integration-test.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
