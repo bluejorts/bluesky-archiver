@@ -1,8 +1,8 @@
 use anyhow::Result;
-use rusqlite::{Connection, params};
-use std::path::Path;
 use chrono::{DateTime, Utc};
-use serde::{Serialize, Deserialize};
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct Database {
@@ -37,10 +37,10 @@ pub struct ArchivedImage {
 impl Database {
     pub fn new(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)?;
-        
+
         let db = Self { conn };
         db.create_tables()?;
-        
+
         Ok(db)
     }
 
@@ -94,7 +94,7 @@ impl Database {
             params![uri],
             |row| row.get(0),
         )?;
-        
+
         Ok(count > 0)
     }
 
@@ -104,7 +104,7 @@ impl Database {
             params![blob_cid],
             |row| row.get(0),
         )?;
-        
+
         Ok(count > 0)
     }
 
@@ -125,7 +125,7 @@ impl Database {
                 post.has_content_warning as i32,
             ],
         )?;
-        
+
         Ok(())
     }
 
@@ -144,24 +144,19 @@ impl Database {
                 image.downloaded_at.to_rfc3339(),
             ],
         )?;
-        
+
         Ok(())
     }
 
     pub fn get_stats(&self) -> Result<(i64, i64)> {
-        let post_count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM archived_posts",
-            [],
-            |row| row.get(0),
-        )?;
-        
-        let image_count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM archived_images",
-            [],
-            |row| row.get(0),
-        )?;
-        
+        let post_count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM archived_posts", [], |row| row.get(0))?;
+
+        let image_count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM archived_images", [], |row| row.get(0))?;
+
         Ok((post_count, image_count))
     }
-
 }

@@ -1,11 +1,11 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
 use serde_json::json;
-use tracing::{info, warn};
-use indicatif::{ProgressBar, ProgressStyle};
-use tokio::time::{sleep, Duration};
 use std::time::Instant;
+use tokio::time::{sleep, Duration};
+use tracing::{info, warn};
 
 const API_BASE: &str = "https://bsky.social/xrpc";
 
@@ -34,7 +34,7 @@ pub struct Post {
     pub uri: String,
     pub cid: String,
     pub author: Author,
-    pub record: Record,
+    pub record: serde_json::Value,
     #[serde(rename = "indexedAt")]
     pub indexed_at: String,
     pub labels: Option<Vec<Label>>,
@@ -86,24 +86,25 @@ pub enum Embed {
 #[derive(Debug, Deserialize)]
 pub struct Image {
     pub alt: Option<String>,
-    pub image: ImageBlob,
+    pub fullsize: String,
+    pub thumb: String,
+    #[serde(rename = "aspectRatio")]
+    pub aspect_ratio: Option<AspectRatio>,
+    pub image: View,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ImageBlob {
-    #[serde(rename = "$type")]
-    pub blob_type: String,
-    #[serde(rename = "ref")]
-    pub blob_ref: BlobRef,
+pub struct AspectRatio {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct View {
+    #[serde(rename = "cid")]
+    pub cid: String,
     #[serde(rename = "mimeType")]
     pub mime_type: String,
-    pub size: u64,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct BlobRef {
-    #[serde(rename = "$link")]
-    pub link: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -140,9 +141,15 @@ impl Post {
     pub fn has_nsfw_labels(&self) -> bool {
         if let Some(labels) = &self.labels {
             labels.iter().any(|label| {
-                matches!(label.val.as_str(), 
-                    "porn" | "sexual" | "nudity" | "graphic-media" | 
-                    "self-harm" | "sensitive" | "content-warning"
+                matches!(
+                    label.val.as_str(),
+                    "porn"
+                        | "sexual"
+                        | "nudity"
+                        | "graphic-media"
+                        | "self-harm"
+                        | "sensitive"
+                        | "content-warning"
                 )
             })
         } else {
@@ -161,17 +168,13 @@ impl Client {
 
     pub async fn login(&mut self, identifier: &str, password: &str) -> Result<()> {
         let url = format!("{}/com.atproto.server.createSession", API_BASE);
-        
+
         let body = json!({
             "identifier": identifier,
             "password": password
         });
 
-        let response = self.http
-            .post(&url)
-            .json(&body)
-            .send()
-            .await?;
+        let response = self.http.post(&url).json(&body).send().await?;
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
@@ -179,7 +182,7 @@ impl Client {
         }
 
         let login_response: LoginResponse = response.json().await?;
-        
+
         self.session = Some(Session {
             did: login_response.did.clone(),
             access_jwt: login_response.access_jwt,
@@ -193,26 +196,34 @@ impl Client {
         self.get_likes_with_delay(actor, limit, 0).await
     }
 
-    pub async fn get_likes_with_delay(&self, actor: &str, limit: usize, delay_ms: u64) -> Result<Vec<Post>> {
-        self.get_likes_with_options(actor, limit, delay_ms, None, None).await
+    pub async fn get_likes_with_delay(
+        &self,
+        actor: &str,
+        limit: usize,
+        delay_ms: u64,
+    ) -> Result<Vec<Post>> {
+        self.get_likes_with_options(actor, limit, delay_ms, None, None)
+            .await
     }
 
     pub async fn get_likes_with_options(
-        &self, 
-        actor: &str, 
-        limit: usize, 
+        &self,
+        actor: &str,
+        limit: usize,
         delay_ms: u64,
         start_cursor: Option<String>,
-        cursor_callback: Option<Box<dyn Fn(&str) + Send>>
+        cursor_callback: Option<Box<dyn Fn(&str) + Send>>,
     ) -> Result<Vec<Post>> {
-        let session = self.session.as_ref()
+        let session = self
+            .session
+            .as_ref()
             .ok_or_else(|| anyhow!("Not authenticated"))?;
 
         let mut all_posts = Vec::new();
         let mut cursor: Option<String> = start_cursor;
         // Use larger page size for better performance, API supports up to 100
         let page_size = if limit == 0 { 100 } else { 100.min(limit) };
-        
+
         if cursor.is_some() {
             info!("Resuming from saved cursor position");
         }
@@ -223,7 +234,7 @@ impl Client {
         } else {
             ProgressBar::new(limit as u64)
         };
-        
+
         pb.set_style(
             if limit == 0 {
                 ProgressStyle::default_spinner()
@@ -234,7 +245,7 @@ impl Client {
                     .progress_chars("=>-")
             }
         );
-        
+
         if limit == 0 {
             pb.set_message("Fetching all liked posts...");
         }
@@ -244,7 +255,7 @@ impl Client {
 
         loop {
             let url = format!("{}/app.bsky.feed.getActorLikes", API_BASE);
-            
+
             let mut params = vec![
                 ("actor", actor.to_string()),
                 ("limit", page_size.to_string()),
@@ -260,7 +271,8 @@ impl Client {
             }
 
             let _request_start = Instant::now();
-            let response = self.http
+            let response = self
+                .http
                 .get(&url)
                 .bearer_auth(&session.access_jwt)
                 .query(&params)
@@ -268,17 +280,25 @@ impl Client {
                 .await?;
 
             let status = response.status();
-            
+
             // Handle rate limiting
             if status.as_u16() == 429 {
                 retry_count += 1;
                 if retry_count > max_retries {
                     pb.finish_and_clear();
-                    return Err(anyhow!("Rate limited after {} retries. Try again later or use --delay flag", max_retries));
+                    return Err(anyhow!(
+                        "Rate limited after {} retries. Try again later or use --delay flag",
+                        max_retries
+                    ));
                 }
-                
+
                 let wait_time = 2u64.pow(retry_count) * 1000; // Exponential backoff in ms
-                pb.set_message(format!("Rate limited! Waiting {}s before retry {}/{}...", wait_time / 1000, retry_count, max_retries));
+                pb.set_message(format!(
+                    "Rate limited! Waiting {}s before retry {}/{}...",
+                    wait_time / 1000,
+                    retry_count,
+                    max_retries
+                ));
                 sleep(Duration::from_millis(wait_time)).await;
                 continue;
             }
@@ -286,7 +306,11 @@ impl Client {
             if !status.is_success() {
                 let error_text = response.text().await?;
                 pb.finish_and_clear();
-                return Err(anyhow!("Failed to fetch likes: {} - {}", status, error_text));
+                return Err(anyhow!(
+                    "Failed to fetch likes: {} - {}",
+                    status,
+                    error_text
+                ));
             }
 
             // Reset retry count on success
@@ -303,18 +327,18 @@ impl Client {
                     return Err(anyhow!("Failed to parse likes response: {}", e));
                 }
             };
-            
+
             let new_posts = likes_response.feed.len();
-            
+
             // Check if we got any posts
             if new_posts == 0 {
                 info!("No more posts returned, reached end of likes");
                 break;
             }
-            
+
             for item in likes_response.feed {
                 all_posts.push(item.post);
-                
+
                 if limit > 0 {
                     pb.inc(1);
                     if all_posts.len() >= limit {
@@ -330,12 +354,12 @@ impl Client {
             }
 
             cursor = likes_response.cursor;
-            
+
             if cursor.is_none() {
                 info!("No cursor returned, reached end of likes");
                 break;
             }
-            
+
             // Save cursor position if callback provided
             if let (Some(ref c), Some(ref callback)) = (&cursor, &cursor_callback) {
                 callback(c);
@@ -352,15 +376,17 @@ impl Client {
         limit: usize,
         delay_ms: u64,
         start_cursor: Option<String>,
-        cursor_callback: Option<Box<dyn Fn(&str) + Send>>
+        cursor_callback: Option<Box<dyn Fn(&str) + Send>>,
     ) -> Result<Vec<Post>> {
-        let session = self.session.as_ref()
+        let session = self
+            .session
+            .as_ref()
             .ok_or_else(|| anyhow!("Not authenticated"))?;
 
         let mut all_posts = Vec::new();
         let mut cursor: Option<String> = start_cursor;
         let page_size = if limit == 0 { 100 } else { 100.min(limit) };
-        
+
         if cursor.is_some() {
             info!("Resuming from saved cursor position");
         }
@@ -371,7 +397,7 @@ impl Client {
         } else {
             ProgressBar::new(limit as u64)
         };
-        
+
         pb.set_style(
             if limit == 0 {
                 ProgressStyle::default_spinner()
@@ -382,7 +408,7 @@ impl Client {
                     .progress_chars("=>-")
             }
         );
-        
+
         if limit == 0 {
             pb.set_message("Fetching all user posts...");
         }
@@ -392,7 +418,7 @@ impl Client {
 
         loop {
             let url = format!("{}/app.bsky.feed.getAuthorFeed", API_BASE);
-            
+
             let mut params = vec![
                 ("actor", actor.to_string()),
                 ("limit", page_size.to_string()),
@@ -408,7 +434,8 @@ impl Client {
                 sleep(Duration::from_millis(delay_ms)).await;
             }
 
-            let response = self.http
+            let response = self
+                .http
                 .get(&url)
                 .bearer_auth(&session.access_jwt)
                 .query(&params)
@@ -416,17 +443,25 @@ impl Client {
                 .await?;
 
             let status = response.status();
-            
+
             // Handle rate limiting
             if status.as_u16() == 429 {
                 retry_count += 1;
                 if retry_count > max_retries {
                     pb.finish_and_clear();
-                    return Err(anyhow!("Rate limited after {} retries. Try again later or use --delay flag", max_retries));
+                    return Err(anyhow!(
+                        "Rate limited after {} retries. Try again later or use --delay flag",
+                        max_retries
+                    ));
                 }
-                
+
                 let wait_time = 2u64.pow(retry_count) * 1000; // Exponential backoff in ms
-                pb.set_message(format!("Rate limited! Waiting {}s before retry {}/{}...", wait_time / 1000, retry_count, max_retries));
+                pb.set_message(format!(
+                    "Rate limited! Waiting {}s before retry {}/{}...",
+                    wait_time / 1000,
+                    retry_count,
+                    max_retries
+                ));
                 sleep(Duration::from_millis(wait_time)).await;
                 continue;
             }
@@ -434,7 +469,11 @@ impl Client {
             if !status.is_success() {
                 let error_text = response.text().await?;
                 pb.finish_and_clear();
-                return Err(anyhow!("Failed to fetch user posts: {} - {}", status, error_text));
+                return Err(anyhow!(
+                    "Failed to fetch user posts: {} - {}",
+                    status,
+                    error_text
+                ));
             }
 
             // Reset retry count on success
@@ -450,48 +489,48 @@ impl Client {
                     return Err(anyhow!("Failed to parse feed response: {}", e));
                 }
             };
-            
+
             let mut new_posts_count = 0;
             let feed_items = feed_response.feed;
             let feed_empty = feed_items.is_empty();
-            
+
             // Filter out reposts and quote posts, only keep original posts with images
             for item in feed_items {
                 // Skip if it's a repost (has reason field)
                 if item.reason.is_some() {
                     continue;
                 }
-                
+
                 let post = item.post;
-                
+
                 // Skip quote posts (check if embed type is record)
-                if let Some(ref embed) = post.record.embed {
-                    if let Embed::Other(value) = embed {
-                        if let Some(embed_type) = value.get("$type").and_then(|v| v.as_str()) {
-                            if embed_type.contains("record") {
-                                continue; // Skip quote posts
-                            }
+                if let Some(embed_value) = post.record.get("embed") {
+                    if let Some(embed_type) = embed_value.get("$type").and_then(|v| v.as_str()) {
+                        if embed_type.contains("record") {
+                            continue; // Skip quote posts
                         }
                     }
                 }
-                
+
                 // Only include posts with image embeds
-                if let Some(ref embed) = post.record.embed {
-                    if let Embed::Images { .. } = embed {
-                        all_posts.push(post);
-                        new_posts_count += 1;
-                        
-                        if limit > 0 {
-                            pb.inc(1);
-                            if all_posts.len() >= limit {
-                                pb.finish_with_message("Fetching complete");
-                                return Ok(all_posts);
+                if let Some(embed_value) = post.record.get("embed") {
+                    if let Ok(embed) = serde_json::from_value::<Embed>(embed_value.clone()) {
+                        if let Embed::Images { .. } = embed {
+                            all_posts.push(post);
+                            new_posts_count += 1;
+
+                            if limit > 0 {
+                                pb.inc(1);
+                                if all_posts.len() >= limit {
+                                    pb.finish_with_message("Fetching complete");
+                                    return Ok(all_posts);
+                                }
                             }
                         }
                     }
                 }
             }
-            
+
             if limit == 0 {
                 pb.set_message(format!("Fetched {} image posts...", all_posts.len()));
                 pb.inc(new_posts_count);
@@ -504,12 +543,12 @@ impl Client {
             }
 
             cursor = feed_response.cursor;
-            
+
             if cursor.is_none() {
                 info!("No cursor returned, reached end of feed");
                 break;
             }
-            
+
             // Save cursor position if callback provided
             if let (Some(ref c), Some(ref callback)) = (&cursor, &cursor_callback) {
                 callback(c);
@@ -521,14 +560,20 @@ impl Client {
     }
 
     pub fn get_image_url(&self, did: &str, cid: &str) -> String {
-        format!("https://bsky.social/xrpc/com.atproto.sync.getBlob?did={}&cid={}", did, cid)
+        format!(
+            "https://bsky.social/xrpc/com.atproto.sync.getBlob?did={}&cid={}",
+            did, cid
+        )
     }
 
     pub async fn download_image(&self, url: &str) -> Result<Vec<u8>> {
-        let session = self.session.as_ref()
+        let session = self
+            .session
+            .as_ref()
             .ok_or_else(|| anyhow!("Not authenticated"))?;
 
-        let response = self.http
+        let response = self
+            .http
             .get(url)
             .bearer_auth(&session.access_jwt)
             .send()

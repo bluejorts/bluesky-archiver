@@ -1,12 +1,12 @@
 use anyhow::Result;
-use std::path::PathBuf;
 use chrono::Utc;
-use tokio::fs;
-use tracing::{info, warn, debug};
 use indicatif::{ProgressBar, ProgressStyle};
+use std::path::PathBuf;
+use tokio::fs;
+use tracing::{debug, info, warn};
 
-use crate::bluesky::{Post, Embed, Image};
-use crate::database::{Database, ArchivedPost, ArchivedImage};
+use crate::bluesky::{Embed, Image, Post};
+use crate::database::{ArchivedImage, ArchivedPost, Database};
 
 pub struct Archiver<'a> {
     db: Database,
@@ -38,7 +38,8 @@ impl<'a> Archiver<'a> {
         };
 
         // Filter posts based on nsfw_only flag
-        let posts_to_process: Vec<_> = posts.into_iter()
+        let posts_to_process: Vec<_> = posts
+            .into_iter()
             .filter(|post| {
                 let is_nsfw = post.has_nsfw_labels();
                 !nsfw_only || is_nsfw
@@ -51,11 +52,16 @@ impl<'a> Archiver<'a> {
         }
 
         // Count total images to process
-        let total_images: usize = posts_to_process.iter()
+        let total_images: usize = posts_to_process
+            .iter()
             .map(|p| self.extract_images(p).len())
             .sum();
 
-        info!("Processing {} posts with {} total images", posts_to_process.len(), total_images);
+        info!(
+            "Processing {} posts with {} total images",
+            posts_to_process.len(),
+            total_images
+        );
 
         // Create progress bar
         let pb = ProgressBar::new(total_images as u64);
@@ -70,7 +76,7 @@ impl<'a> Archiver<'a> {
         for post in posts_to_process.iter() {
             let is_nsfw = post.has_nsfw_labels();
             pb.set_message(format!("Processing @{}", post.author.handle));
-            
+
             match self.archive_post(&post, is_nsfw).await {
                 Ok((downloaded, skipped)) => {
                     stats.downloaded += downloaded;
@@ -95,7 +101,10 @@ impl<'a> Archiver<'a> {
     async fn archive_post(&self, post: &Post, is_nsfw: bool) -> Result<(usize, usize)> {
         // Check if we've already processed this post
         if self.db.is_post_archived(&post.uri)? {
-            debug!("Post {} already archived, checking for new images", post.uri);
+            debug!(
+                "Post {} already archived, checking for new images",
+                post.uri
+            );
         }
 
         let images = self.extract_images(post);
@@ -110,10 +119,19 @@ impl<'a> Archiver<'a> {
             cid: post.cid.clone(),
             author_did: post.author.did.clone(),
             author_handle: post.author.handle.clone(),
-            post_text: post.record.text.clone(),
+            post_text: post
+                .record
+                .get("text")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             image_count: images.len() as i32,
             archived_at: Utc::now(),
-            post_created_at: post.record.created_at.clone(),
+            post_created_at: post
+                .record
+                .get("createdAt")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
             has_content_warning: is_nsfw,
         };
         self.db.save_post(&archived_post)?;
@@ -132,8 +150,8 @@ impl<'a> Archiver<'a> {
 
         // Download each image
         for (idx, image) in images.iter().enumerate() {
-            let blob_cid = &image.image.blob_ref.link;
-            
+            let blob_cid = &image.image.cid;
+
             // Check if already downloaded
             if self.db.is_image_archived(blob_cid)? {
                 debug!("Image {} already downloaded", blob_cid);
@@ -149,9 +167,16 @@ impl<'a> Archiver<'a> {
                 "image/webp" => "webp",
                 _ => "bin",
             };
-            
-            let timestamp = post.record.created_at.replace(":", "-").replace(".", "-");
-            let filename = format!("{}_{}_{}_{}.{}", 
+
+            let timestamp = post
+                .record
+                .get("createdAt")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .replace(":", "-")
+                .replace(".", "-");
+            let filename = format!(
+                "{}_{}_{}_{}.{}",
                 post.author.handle,
                 timestamp,
                 &post.cid[..8],
@@ -161,7 +186,10 @@ impl<'a> Archiver<'a> {
             let file_path = author_dir.join(&filename);
 
             // Download image
-            match self.download_image(&post.author.did, blob_cid, &file_path).await {
+            match self
+                .download_image(&post.author.did, blob_cid, &file_path)
+                .await
+            {
                 Ok(size) => {
                     // Save to database
                     let archived_image = ArchivedImage {
@@ -171,11 +199,11 @@ impl<'a> Archiver<'a> {
                         filename: filename.clone(),
                         mime_type: image.image.mime_type.clone(),
                         size: size as i64,
-                        alt_text: image.alt.clone(),
+                        alt_text: image.alt.clone().filter(|s| !s.is_empty()),
                         downloaded_at: Utc::now(),
                     };
                     self.db.save_image(&archived_image)?;
-                    
+
                     info!("Downloaded: {}", filename);
                     downloaded += 1;
                 }
@@ -188,18 +216,22 @@ impl<'a> Archiver<'a> {
         Ok((downloaded, skipped))
     }
 
-    fn extract_images<'b>(&self, post: &'b Post) -> Vec<&'b Image> {
-        let mut images = Vec::new();
-        
-        if let Some(embed) = &post.record.embed {
-            match embed {
-                Embed::Images { images: img_list, .. } => {
-                    images.extend(img_list.iter());
+    fn extract_images(&self, post: &Post) -> Vec<Image> {
+        let images = Vec::new();
+
+        if let Some(embed_value) = post.record.get("embed") {
+            if let Ok(embed) = serde_json::from_value::<Embed>(embed_value.clone()) {
+                match embed {
+                    Embed::Images {
+                        images: img_list, ..
+                    } => {
+                        return img_list;
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
-        
+
         images
     }
 
@@ -207,9 +239,9 @@ impl<'a> Archiver<'a> {
         let url = self.client.get_image_url(did, blob_cid);
         let bytes = self.client.download_image(&url).await?;
         let size = bytes.len() as u64;
-        
+
         fs::write(path, bytes).await?;
-        
+
         Ok(size)
     }
 }

@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use tracing::{info, warn};
 use tracing_subscriber;
 
-mod bluesky;
 mod archive;
+mod bluesky;
 mod database;
 
 #[derive(Parser, Debug)]
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
     // Check if we're archiving a specific user's posts or liked posts
     if let Some(target_user) = args.archive_user {
         info!("Archiving all image posts from user: {}", target_user);
-        
+
         // Fetch user's posts
         let cursor_file = args.output.join(format!(".cursor_{}", target_user));
         let start_cursor = if args.resume && cursor_file.exists() {
@@ -93,29 +93,31 @@ async fn main() -> Result<()> {
         } else {
             None
         };
-        
+
         let cursor_file_clone = cursor_file.clone();
-        let posts = client.get_user_posts_with_options(
-            &target_user,
-            args.limit,
-            args.delay,
-            start_cursor,
-            Some(Box::new(move |cursor| {
-                if let Err(e) = std::fs::write(&cursor_file_clone, cursor) {
-                    warn!("Failed to save cursor: {}", e);
-                }
-            }))
-        ).await?;
-        
+        let posts = client
+            .get_user_posts_with_options(
+                &target_user,
+                args.limit,
+                args.delay,
+                start_cursor,
+                Some(Box::new(move |cursor| {
+                    if let Err(e) = std::fs::write(&cursor_file_clone, cursor) {
+                        warn!("Failed to save cursor: {}", e);
+                    }
+                })),
+            )
+            .await?;
+
         // Clear cursor on successful completion
         if cursor_file.exists() {
             let _ = std::fs::remove_file(&cursor_file);
         }
-        
+
         // Archive images from user's posts
         let archiver = archive::Archiver::new(db, args.output, &client);
         let stats = archiver.archive_posts(posts, args.nsfw_only).await?;
-        
+
         info!(
             "Archive complete. Downloaded: {}, Skipped: {}, Failed: {}",
             stats.downloaded, stats.skipped, stats.failed
@@ -137,20 +139,22 @@ async fn main() -> Result<()> {
         } else {
             None
         };
-        
+
         let cursor_file_clone = cursor_file.clone();
-        let likes = client.get_likes_with_options(
-            &args.username, 
-            args.limit, 
-            args.delay,
-            start_cursor,
-            Some(Box::new(move |cursor| {
-                if let Err(e) = std::fs::write(&cursor_file_clone, cursor) {
-                    warn!("Failed to save cursor: {}", e);
-                }
-            }))
-        ).await?;
-        
+        let likes = client
+            .get_likes_with_options(
+                &args.username,
+                args.limit,
+                args.delay,
+                start_cursor,
+                Some(Box::new(move |cursor| {
+                    if let Err(e) = std::fs::write(&cursor_file_clone, cursor) {
+                        warn!("Failed to save cursor: {}", e);
+                    }
+                })),
+            )
+            .await?;
+
         // Clear cursor on successful completion
         if cursor_file.exists() {
             let _ = std::fs::remove_file(&cursor_file);
@@ -159,7 +163,7 @@ async fn main() -> Result<()> {
         // Archive images from liked posts
         let archiver = archive::Archiver::new(db, args.output, &client);
         let stats = archiver.archive_posts(likes, args.nsfw_only).await?;
-        
+
         info!(
             "Archive complete. Downloaded: {}, Skipped: {}, Failed: {}",
             stats.downloaded, stats.skipped, stats.failed
