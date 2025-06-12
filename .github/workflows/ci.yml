@@ -39,17 +39,8 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
-      - name: Run unit tests (excluding integration tests)
-        run: |
-          # Run specific test files, excluding integration_tests
-          cargo test --test advanced_tests --verbose
-          cargo test --test api_format_tests --verbose
-          cargo test --test archive_tests --verbose
-          cargo test --test bluesky_tests --verbose
-          cargo test --test database_tests --verbose
-          # Run library and binary tests if any exist
-          cargo test --lib --verbose || true
-          cargo test --bins --verbose || true
+      - name: Run unit tests
+        run: cargo test --verbose
 
       - name: Run clippy
         run: cargo clippy -- -D warnings
@@ -89,7 +80,7 @@ jobs:
           # Only run integration tests if credentials are set
           if [ -n "$BLUESKY_USERNAME" ] && [ -n "$BLUESKY_APP_PASSWORD" ]; then
             echo "Running integration tests with authentication..."
-            cargo test --test integration_tests --verbose
+            cargo test --verbose tests/integration/
           else
             echo "Skipping integration tests - credentials not available"
           fi
