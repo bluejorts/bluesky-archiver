@@ -182,6 +182,21 @@ bluesky-archiver -u your.username -p your-app-password -l 0 -d 100
 bluesky-archiver -u your.username -p your-app-password -l 0 -d 100 --resume
 ```
 
+## GitHub Actions Setup
+
+This project includes GitHub Actions workflows for CI/CD. To enable integration tests in your fork:
+
+1. Go to your repository Settings → Secrets and variables → Actions
+2. Add the following repository secrets:
+   - `BLUESKY_USERNAME`: Your Bluesky username (without @)
+   - `BLUESKY_PASSWORD`: Your Bluesky app password (not your main password)
+
+The integration tests will automatically run when:
+- You push to the main branch
+- You create a pull request from within the same repository
+
+Integration tests are skipped for pull requests from forks for security reasons.
+
 ## Scheduling
 
 To run this tool on a schedule, you can use cron (Linux/Mac) or Task Scheduler (Windows).
