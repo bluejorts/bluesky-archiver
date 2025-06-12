@@ -81,8 +81,12 @@ async fn test_embed_parsing() {
                 "height": 1080
             },
             "image": {
-                "cid": "bafyimage123",
-                "mimeType": "image/jpeg"
+                "$type": "blob",
+                "ref": {
+                    "$link": "bafyimage123"
+                },
+                "mimeType": "image/jpeg",
+                "size": 1024
             }
         }]
     });

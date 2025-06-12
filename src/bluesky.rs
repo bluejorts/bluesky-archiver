@@ -110,11 +110,22 @@ pub struct AspectRatio {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct View {
-    #[serde(rename = "cid")]
-    pub cid: String,
+    #[serde(rename = "$type")]
+    pub type_: String,
+    #[serde(rename = "ref")]
+    pub ref_: BlobRef,
     #[serde(rename = "mimeType")]
     pub mime_type: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct BlobRef {
+    #[serde(rename = "$link")]
+    pub link: String,
 }
 
 #[derive(Debug, Deserialize)]

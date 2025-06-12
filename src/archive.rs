@@ -150,7 +150,7 @@ impl<'a> Archiver<'a> {
 
         // Download each image
         for (idx, image) in images.iter().enumerate() {
-            let blob_cid = &image.image.cid;
+            let blob_cid = &image.image.ref_.link;
 
             // Check if already downloaded
             if self.db.is_image_archived(blob_cid)? {
