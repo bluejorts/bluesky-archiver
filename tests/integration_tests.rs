@@ -1,5 +1,5 @@
 //! Integration tests that require external services (Bluesky API)
-//! 
+//!
 //! Run with: cargo test --test integration_tests
 //! Skip with: cargo test -- --skip integration_tests
 

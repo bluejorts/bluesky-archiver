@@ -257,6 +257,31 @@ The test suite includes:
 - **Integration tests** for full archive workflows (requires valid credentials)
 - **Advanced tests** for NSFW filtering, duplicate detection, and statistics
 
+## Development Setup
+
+### Pre-commit Hooks
+
+This project uses pre-commit hooks to ensure code quality. To set up:
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install the git hooks
+pre-commit install
+
+# Run against all files (optional)
+pre-commit run --all-files
+```
+
+The pre-commit hooks will automatically:
+- Format code with `cargo fmt`
+- Run `cargo clippy` with warnings as errors
+- Run all tests with `cargo test`
+- Build the project with `cargo build`
+- Fix trailing whitespace and file endings
+- Validate YAML and TOML files
+
 ## License
 
 MIT

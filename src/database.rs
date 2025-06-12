@@ -110,7 +110,7 @@ impl Database {
 
     pub fn save_post(&self, post: &ArchivedPost) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO archived_posts 
+            "INSERT OR REPLACE INTO archived_posts
              (uri, cid, author_did, author_handle, post_text, image_count, archived_at, post_created_at, has_content_warning)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
@@ -131,7 +131,7 @@ impl Database {
 
     pub fn save_image(&self, image: &ArchivedImage) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO archived_images 
+            "INSERT OR REPLACE INTO archived_images
              (post_uri, blob_cid, filename, mime_type, size, alt_text, downloaded_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
