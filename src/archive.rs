@@ -220,7 +220,10 @@ impl<'a> Archiver<'a> {
         let images = Vec::new();
 
         if let Some(embed_value) = post.record.get("embed") {
-            if let Ok(Embed::Images { images: img_list, .. }) = serde_json::from_value::<Embed>(embed_value.clone()) {
+            if let Ok(Embed::Images {
+                images: img_list, ..
+            }) = serde_json::from_value::<Embed>(embed_value.clone())
+            {
                 return img_list;
             }
         }

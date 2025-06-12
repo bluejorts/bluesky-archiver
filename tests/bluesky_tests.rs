@@ -10,7 +10,9 @@ async fn test_client_creation() {
 #[tokio::test]
 async fn test_get_likes_not_authenticated() {
     let client = Client::new();
-    let result = client.get_likes_with_options("test.bsky.social", 10, 0, None, None).await;
+    let result = client
+        .get_likes_with_options("test.bsky.social", 10, 0, None, None)
+        .await;
     assert!(result.is_err());
     assert!(result
         .unwrap_err()

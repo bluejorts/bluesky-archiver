@@ -209,7 +209,6 @@ impl Client {
         Ok(())
     }
 
-
     pub async fn get_likes_with_options(
         &self,
         actor: &str,
@@ -518,7 +517,9 @@ impl Client {
 
                 // Only include posts with image embeds
                 if let Some(embed_value) = post.record.get("embed") {
-                    if let Ok(Embed::Images { .. }) = serde_json::from_value::<Embed>(embed_value.clone()) {
+                    if let Ok(Embed::Images { .. }) =
+                        serde_json::from_value::<Embed>(embed_value.clone())
+                    {
                         all_posts.push(post);
                         new_posts_count += 1;
 
