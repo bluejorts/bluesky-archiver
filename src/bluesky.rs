@@ -9,6 +9,8 @@ use tracing::{info, warn};
 
 const API_BASE: &str = "https://bsky.social/xrpc";
 
+type CursorCallback = Box<dyn Fn(&str) + Send>;
+
 #[derive(Debug, Clone)]
 pub struct Client {
     http: HttpClient,
@@ -167,12 +169,18 @@ impl Post {
     }
 }
 
-impl Client {
-    pub fn new() -> Self {
+impl Default for Client {
+    fn default() -> Self {
         Self {
             http: HttpClient::new(),
             session: None,
         }
+    }
+}
+
+impl Client {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub async fn login(&mut self, identifier: &str, password: &str) -> Result<()> {
@@ -208,7 +216,7 @@ impl Client {
         limit: usize,
         delay_ms: u64,
         start_cursor: Option<String>,
-        cursor_callback: Option<Box<dyn Fn(&str) + Send>>,
+        cursor_callback: Option<CursorCallback>,
     ) -> Result<Vec<Post>> {
         let session = self
             .session
@@ -372,7 +380,7 @@ impl Client {
         limit: usize,
         delay_ms: u64,
         start_cursor: Option<String>,
-        cursor_callback: Option<Box<dyn Fn(&str) + Send>>,
+        cursor_callback: Option<CursorCallback>,
     ) -> Result<Vec<Post>> {
         let session = self
             .session
@@ -510,17 +518,15 @@ impl Client {
 
                 // Only include posts with image embeds
                 if let Some(embed_value) = post.record.get("embed") {
-                    if let Ok(embed) = serde_json::from_value::<Embed>(embed_value.clone()) {
-                        if let Embed::Images { .. } = embed {
-                            all_posts.push(post);
-                            new_posts_count += 1;
+                    if let Ok(Embed::Images { .. }) = serde_json::from_value::<Embed>(embed_value.clone()) {
+                        all_posts.push(post);
+                        new_posts_count += 1;
 
-                            if limit > 0 {
-                                pb.inc(1);
-                                if all_posts.len() >= limit {
-                                    pb.finish_with_message("Fetching complete");
-                                    return Ok(all_posts);
-                                }
+                        if limit > 0 {
+                            pb.inc(1);
+                            if all_posts.len() >= limit {
+                                pb.finish_with_message("Fetching complete");
+                                return Ok(all_posts);
                             }
                         }
                     }

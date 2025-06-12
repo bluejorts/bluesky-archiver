@@ -77,7 +77,7 @@ impl<'a> Archiver<'a> {
             let is_nsfw = post.has_nsfw_labels();
             pb.set_message(format!("Processing @{}", post.author.handle));
 
-            match self.archive_post(&post, is_nsfw).await {
+            match self.archive_post(post, is_nsfw).await {
                 Ok((downloaded, skipped)) => {
                     stats.downloaded += downloaded;
                     stats.skipped += skipped;
@@ -220,15 +220,8 @@ impl<'a> Archiver<'a> {
         let images = Vec::new();
 
         if let Some(embed_value) = post.record.get("embed") {
-            if let Ok(embed) = serde_json::from_value::<Embed>(embed_value.clone()) {
-                match embed {
-                    Embed::Images {
-                        images: img_list, ..
-                    } => {
-                        return img_list;
-                    }
-                    _ => {}
-                }
+            if let Ok(Embed::Images { images: img_list, .. }) = serde_json::from_value::<Embed>(embed_value.clone()) {
+                return img_list;
             }
         }
 
