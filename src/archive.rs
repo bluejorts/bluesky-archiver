@@ -217,18 +217,22 @@ impl<'a> Archiver<'a> {
     }
 
     fn extract_images(&self, post: &Post) -> Vec<Image> {
-        let images = Vec::new();
-
         if let Some(embed_value) = post.record.get("embed") {
+            debug!("Found embed in post: {:?}", embed_value);
             if let Ok(Embed::Images {
                 images: img_list, ..
             }) = serde_json::from_value::<Embed>(embed_value.clone())
             {
+                debug!("Successfully parsed {} images from embed", img_list.len());
                 return img_list;
+            } else {
+                debug!("Failed to parse embed as Images type");
             }
+        } else {
+            debug!("No embed found in post record");
         }
 
-        images
+        Vec::new()
     }
 
     async fn download_image(&self, did: &str, blob_cid: &str, path: &PathBuf) -> Result<u64> {

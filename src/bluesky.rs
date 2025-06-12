@@ -370,6 +370,7 @@ impl Client {
         }
 
         pb.finish_with_message(format!("Fetched all {} posts", all_posts.len()));
+        info!("Total posts fetched: {}", all_posts.len());
         Ok(all_posts)
     }
 
